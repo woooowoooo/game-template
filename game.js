@@ -63,14 +63,6 @@ addEventListener("mouseup", function (e) {
 	clicked = false;
 	console.log("The mouse was released.");
 });
-// Dunno
-let person = {
-	name: "Zoosmell Pooplord",
-	age: 15,
-	brains: 80,
-	brawn: 30,
-	beauty: 40,
-};
 // State machine
 let stateMachine = new StateMachine({
 	init: "booting",
