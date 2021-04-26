@@ -101,12 +101,14 @@ function button(x, y, text, callback, width) {
 	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
 	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
 	hitbox.closePath();
-	addEventListener("click", function (e) {
+	let fullCallback = function (e) {
 		getMousePosition(e);
 		if (canvasContext.isPointInPath(hitbox, mouse.x, mouse.y)) {
 			callback();
 		}
-	});
+		removeEventListener("click", fullCallback);
+	};
+	addEventListener("click", fullCallback);
 }
 // State machine
 let stateMachine = new StateMachine({
