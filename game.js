@@ -25,7 +25,21 @@ function loadResources(images, sounds) {
 		successes++;
 		console.log(this.tagName + " " + this.src.split("/")[this.src.split("/").length - 1] + " has loaded; total " + successes + " successes.");
 		if (successes == images.length + sounds.length) {
-			stateMachine.ready();
+			// Prompt for user interaction so autoplay won't get blocked
+			clear();
+			canvasContext.rect(0, 0, 1920, 1280);
+			canvasContext.fillStyle = "rgb(0, 0, 0)";
+			canvasContext.fill();
+			setFontSize(8);
+			canvasContext.fillStyle = "rgb(255, 255, 255)";
+			canvasContext.fillText("Loading finished.", 960, 400);
+			canvasContext.fillText("CLICK ANYWHERE", 960, 800);
+			canvasContext.fillText("TO CONTINUE", 960, 960);
+			let waitFunction = function () {
+				removeEventListener("click", waitFunction);
+				stateMachine.ready();
+			}
+			addEventListener("click", waitFunction);
 		}
 	};
 	images.forEach(function (assetName) {
@@ -102,11 +116,11 @@ function button(x, y, text, callback, width) {
 	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
 	hitbox.closePath();
 	let fullCallback = function (e) {
+		removeEventListener("click", fullCallback);
 		getMousePosition(e);
 		if (canvasContext.isPointInPath(hitbox, mouse.x, mouse.y)) {
 			callback();
 		}
-		removeEventListener("click", fullCallback);
 	};
 	addEventListener("click", fullCallback);
 }
@@ -145,20 +159,18 @@ let stateMachine = new StateMachine({
 			console.log("Transition: " + lifecycle.transition + "\nNew State: " + lifecycle.to);
 		},
 		onBooting: function () {
-			// Draw loading screen
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgb(0, 0, 0)";
 			canvasContext.fill();
 			canvasContext.textAlign = "center";
 			setFontSize(16);
 			canvasContext.fillStyle = "rgb(255, 255, 255)";
-			canvasContext.fillText("LOADING", 960, 480);
+			canvasContext.fillText("LOADING", 960, 400);
 			setFontSize(8);
-			canvasContext.fillText("If this doesn't go away,", 960, 640);
-			canvasContext.fillText("refresh the page.", 960, 720);
+			canvasContext.fillText("If this doesn't go away,", 960, 800);
+			canvasContext.fillText("refresh the page.", 960, 960);
 		},
 		onMenu: function () {
-			// Draw start menu
 			clear();
 			canvasContext.drawImage(cache.start, 0, 0, 1920, 1280);
 			cache.goldbergAria.play();
@@ -183,7 +195,7 @@ let stateMachine = new StateMachine({
 				if (!cache[assetName].paused) {
 					cache[assetName].pause();
 					pausedAudio[index] = true;
-					console.log("PausedAudio[" + index + "], " + assetName + ", is now true.");
+					console.log(assetName + " is now paused.");
 				}
 			});
 			canvasContext.rect(0, 0, 1920, 1280);
@@ -191,11 +203,11 @@ let stateMachine = new StateMachine({
 			canvasContext.fill();
 			setFontSize(16);
 			canvasContext.fillStyle = "rgb(255, 255, 255)";
-			canvasContext.fillText("PAUSED", 960, 480);
-			button(640, 800, "Menu", function () {
+			canvasContext.fillText("PAUSED", 960, 400);
+			button(672, 880, "Menu", function () {
 				stateMachine.quit();
 			}, 480);
-			button(1280, 800, "Return", function () {
+			button(1248, 880, "Return", function () {
 				stateMachine.unpause();
 			}, 480);
 		},
@@ -205,7 +217,7 @@ let stateMachine = new StateMachine({
 				if (pausedAudio[index]) {
 					cache[assetName].play();
 					pausedAudio[index] = false;
-					console.log("PausedAudio[" + index + "], " + assetName + ", is now false.");
+					console.log(assetName + " is now unpaused.");
 				}
 			});
 		}
