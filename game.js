@@ -1,9 +1,21 @@
-// Canvas
 let canvas = document.getElementById("game");
 canvas.width = 1920;
 canvas.height = 1280;
 let canvasContext = canvas.getContext("2d");
 canvasContext.imageSmoothingEnabled = false;
+// Variables
+let keysPressed = {};
+let mouse = {
+	x: 0,
+	y: 0
+};
+let cache = {};
+const images = ["start", "main", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
+const sounds = ["mainTheme"];
+let paused = false;
+let pausedAudio = {};
+let muted = false;
+let buttons = {};
 // Helper functions
 function clear() {
 	canvasContext.clearRect(0, 0, 1920, 1280);
@@ -11,19 +23,34 @@ function clear() {
 function setFontSize(size) {
 	canvasContext.font = `${size * 1024 / 100}px "Commodore 64", sans-serif`;
 }
+function getMousePosition(event) {
+    let bounds = canvas.getBoundingClientRect();
+    mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
+    mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
+}
+function wrapClickEvent(listenerID, callback, condition) {
+	let fullCallback = function (e) {
+		getMousePosition(e);
+		if (condition(e)) {
+			callback();
+			removeEventListener("click", fullCallback);
+		}
+	};
+	addEventListener("click", fullCallback);
+	buttons[listenerID] = fullCallback;
+}
 // Loading assets
-let cache = {};
 function loadResources(images, sounds) {
 	let successes = 0;
 	console.log("Images has length " + images.length + " and sounds has length " + sounds.length + ".");
 	let initialize = function (type, eventType, folder, path, extension) {
 		cache[path] = document.createElement(type);
-		cache[path].addEventListener(eventType, success, false);
+		cache[path].addEventListener(eventType, success);
 		cache[path].src = folder + path + extension;
 	};
-	let success = function () {
+	let success = function (e) {
+		this.removeEventListener(e.type, success);
 		successes++;
-		console.log(this.tagName + " " + this.src.split("/")[this.src.split("/").length - 1] + " has loaded; total " + successes + " successes.");
 		if (successes == images.length + sounds.length) {
 			// Prompt for user interaction so autoplay won't get blocked
 			clear();
@@ -36,10 +63,10 @@ function loadResources(images, sounds) {
 			canvasContext.fillText("CLICK ANYWHERE", 960, 800);
 			canvasContext.fillText("TO CONTINUE", 960, 960);
 			let waitFunction = function () {
-				removeEventListener("click", waitFunction);
+				console.log(cache);
 				stateMachine.ready();
 			}
-			addEventListener("click", waitFunction);
+			wrapClickEvent("autoplayPrompt", waitFunction, () => true);
 		}
 	};
 	images.forEach(function (assetName) {
@@ -49,27 +76,15 @@ function loadResources(images, sounds) {
 		initialize("audio", "canplaythrough", "sounds/", assetName, ".mp3");
 	});
 }
-const images = ["start", "main", "buttonStart", "buttonMiddle", "buttonEnd"];
-const sounds = ["goldbergAria"];
 // Game loop
 function loop() {
-	render();
-	handle();
 	if (stateMachine.is("main")) {
+		render();
+		handle();
 		requestAnimationFrame(loop);
 	}
 }
-// Noting input
-let keysPressed = {};
-let mouse = {
-	x: 0,
-	y: 0
-};
-function getMousePosition(event) {
-    let bounds = canvas.getBoundingClientRect();
-    mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
-    mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
-}
+// Handling input
 addEventListener("keydown", function (e) {
 	keysPressed[e.key] = true;
 	console.log("The \"" + e.key + "\" key was pressed.");
@@ -82,14 +97,9 @@ addEventListener("click", function (e) {
 	getMousePosition(e);
 	console.log("The mouse was clicked on " + mouse.x + ", " + mouse.y + ".");
 });
-// Handling input
-let pausedAudio = {};
 function handle() {
 	if ("p" in keysPressed || "P" in keysPressed || "Escape" in keysPressed) {
 		stateMachine.pause();
-	}
-	if ("t" in keysPressed) {
-		cache.goldbergAria.play();
 	}
 }
 // Rendering everything
@@ -97,7 +107,26 @@ function render() {
 	clear();
 	canvasContext.drawImage(cache.main, 0, 0, 1920, 1280);
 }
-function button(x, y, text, callback, width) {
+// Buttons
+function createButton(id, x, y, dx, dy, imagePath, callback) {
+	canvasContext.drawImage(cache[imagePath], x, y, dx, dy);
+	let hitbox = new Path2D();
+	hitbox.rect(x, y, dx, dy);
+	hitbox.closePath();
+	wrapClickEvent(id, callback, function (e) {
+		getMousePosition(e);
+		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && !paused;
+	});
+}
+function muteButton() {
+	createButton(muted ? "unmute" : "mute", 1920 - 96, 1280 - 96, 96, 96, muted ? "soundOff" : "soundOn", function () {
+		sounds.forEach(function (assetName) {
+			cache[assetName].muted = !muted;
+		});
+		muted = !muted;
+	});
+}
+function textButton(x, y, text, callback, width, ignorePause = false) {
 	setFontSize(8);
 	let buttonWidth = Math.ceil(canvasContext.measureText(text).width / 32) * 32;
 	if (width) {
@@ -115,14 +144,10 @@ function button(x, y, text, callback, width) {
 	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
 	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
 	hitbox.closePath();
-	let fullCallback = function (e) {
-		removeEventListener("click", fullCallback);
+	wrapClickEvent(text.toLowerCase(), callback, function (e) {
 		getMousePosition(e);
-		if (canvasContext.isPointInPath(hitbox, mouse.x, mouse.y)) {
-			callback();
-		}
-	};
-	addEventListener("click", fullCallback);
+		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause);
+	});
 }
 // State machine
 let stateMachine = new StateMachine({
@@ -157,8 +182,13 @@ let stateMachine = new StateMachine({
 	methods: {
 		onTransition: function (lifecycle) {
 			console.log("Transition: " + lifecycle.transition + "\nNew State: " + lifecycle.to);
+			for (button in buttons) {
+				removeEventListener("click", buttons[button]);
+				delete buttons[button];
+			}
 		},
 		onBooting: function () {
+			loadResources(images, sounds);
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgb(0, 0, 0)";
 			canvasContext.fill();
@@ -173,29 +203,30 @@ let stateMachine = new StateMachine({
 		onMenu: function () {
 			clear();
 			canvasContext.drawImage(cache.start, 0, 0, 1920, 1280);
-			cache.goldbergAria.play();
-			button(960, 640, "Easy", function () {
+			cache.mainTheme.play();
+			textButton(960, 640, "Easy", function () {
 				console.log("Easy difficulty");
 				stateMachine.start();
 			}, 480);
-			button(960, 800, "Medium", function () {
+			textButton(960, 800, "Medium", function () {
 				console.log("Medium difficulty");
 				stateMachine.start();
 			}, 480);
-			button(960, 960, "Hard", function () {
+			textButton(960, 960, "Hard", function () {
 				console.log("Hard difficulty");
 				stateMachine.start();
 			}, 480);
+			muteButton();
 		},
-		onMain: function() {
+		onMain: function () {
 			loop();
 		},
 		onPause: function () {
+			paused = true;
 			sounds.forEach(function (assetName, index) {
 				if (!cache[assetName].paused) {
 					cache[assetName].pause();
 					pausedAudio[index] = true;
-					console.log(assetName + " is now paused.");
 				}
 			});
 			canvasContext.rect(0, 0, 1920, 1280);
@@ -204,24 +235,22 @@ let stateMachine = new StateMachine({
 			setFontSize(16);
 			canvasContext.fillStyle = "rgb(255, 255, 255)";
 			canvasContext.fillText("PAUSED", 960, 400);
-			button(672, 880, "Menu", function () {
+			textButton(672, 880, "Menu", function () {
 				stateMachine.quit();
-			}, 480);
-			button(1248, 880, "Return", function () {
+			}, 480, true);
+			textButton(1248, 880, "Return", function () {
 				stateMachine.unpause();
-			}, 480);
+			}, 480, true);
 		},
-		onUnpause: function () {
+		onLeavePaused: function () {
+			paused = false;
 			clear();
 			sounds.forEach(function (assetName, index) {
 				if (pausedAudio[index]) {
 					cache[assetName].play();
 					pausedAudio[index] = false;
-					console.log(assetName + " is now unpaused.");
 				}
 			});
 		}
 	}
 });
-// Start
-loadResources(images, sounds);
