@@ -10,7 +10,7 @@ let mouse = {
 	y: 0
 };
 let cache = {};
-const images = ["start", "main", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
+const images = ["start", "main", "credits", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
 const sounds = ["mainTheme"];
 let paused = false;
 let pausedAudio = {};
@@ -19,14 +19,18 @@ let buttons = {};
 // Helper functions
 function clear() {
 	canvasContext.clearRect(0, 0, 1920, 1280);
-}
-function setFontSize(size) {
-	canvasContext.font = `${size * 1024 / 100}px "Commodore 64", sans-serif`;
+	for (button in buttons) {
+		removeEventListener("click", buttons[button]);
+		delete buttons[button];
+	}
 }
 function getMousePosition(event) {
     let bounds = canvas.getBoundingClientRect();
     mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
     mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
+}
+function setFontSize(size) {
+	canvasContext.font = `${size * 1024 / 100}px "Commodore 64", sans-serif`;
 }
 function wrapClickEvent(listenerID, callback, condition) {
 	let fullCallback = function (e) {
@@ -39,6 +43,64 @@ function wrapClickEvent(listenerID, callback, condition) {
 	addEventListener("click", fullCallback);
 	buttons[listenerID] = fullCallback;
 }
+// Buttons
+function createButton(id, x, y, dx, dy, imagePath, callback) {
+	canvasContext.drawImage(cache[imagePath], x, y, dx, dy);
+	let hitbox = new Path2D();
+	hitbox.rect(x, y, dx, dy);
+	hitbox.closePath();
+	wrapClickEvent(id, callback, function (e) {
+		getMousePosition(e);
+		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && !paused;
+	});
+}
+function muteButton() {
+	createButton(muted ? "unmute" : "mute", 1920 - 96, 1280 - 96, 96, 96, muted ? "soundOff" : "soundOn", function () {
+		sounds.forEach(function (assetName) {
+			cache[assetName].muted = !muted;
+		});
+		muted = !muted;
+		console.log(muted ? "Muted" : "Unmuted");
+		removeEventListener("click", buttons[muted ? "soundOff" : "soundOn"]);
+		delete buttons[muted ? "soundOff" : "soundOn"];
+	});
+}
+function textButton(x, y, text, callback, width, ignorePause = false) {
+	setFontSize(8);
+	let buttonWidth = Math.ceil(canvasContext.measureText(text).width / 32) * 32;
+	if (width) {
+		buttonWidth = width - 160;
+	}
+	// Draw button
+	canvasContext.drawImage(cache.buttonStart, x - buttonWidth / 2 - 80, y, 80, 128);
+	canvasContext.drawImage(cache.buttonMiddle, x - buttonWidth / 2, y, buttonWidth, 128);
+	canvasContext.drawImage(cache.buttonEnd, x + buttonWidth / 2, y, 80, 128);
+	canvasContext.textAlign = "center";
+	canvasContext.fillStyle = "rgb(0, 0, 0)";
+	canvasContext.fillText(text, x, y + 92);
+	// Detect clicks
+	let hitbox = new Path2D();
+	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
+	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
+	hitbox.closePath();
+	wrapClickEvent(text.toLowerCase(), callback, function (e) {
+		getMousePosition(e);
+		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause);
+	});
+}
+// Noting input
+addEventListener("keydown", function (e) {
+	keysPressed[e.key] = true;
+	console.log("The \"" + e.key + "\" key was pressed.");
+});
+addEventListener("keyup", function (e) {
+	delete keysPressed[e.key];
+	console.log("The \"" + e.key + "\" key was released.");
+});
+addEventListener("click", function (e) {
+	getMousePosition(e);
+	console.log("The mouse was clicked on " + mouse.x + ", " + mouse.y + ".");
+});
 // Loading assets
 function loadResources(images, sounds) {
 	let successes = 0;
@@ -76,92 +138,24 @@ function loadResources(images, sounds) {
 		initialize("audio", "canplaythrough", "sounds/", assetName, ".mp3");
 	});
 }
-// Game loop
-function loop() {
-	if (stateMachine.is("main")) {
-		render();
-		handle();
-		requestAnimationFrame(loop);
-	}
-}
-// Handling input
-addEventListener("keydown", function (e) {
-	keysPressed[e.key] = true;
-	console.log("The \"" + e.key + "\" key was pressed.");
-});
-addEventListener("keyup", function (e) {
-	delete keysPressed[e.key];
-	console.log("The \"" + e.key + "\" key was released.");
-});
-addEventListener("click", function (e) {
-	getMousePosition(e);
-	console.log("The mouse was clicked on " + mouse.x + ", " + mouse.y + ".");
-});
-function handle() {
-	if ("p" in keysPressed || "P" in keysPressed || "Escape" in keysPressed) {
-		stateMachine.pause();
-	}
-}
-// Rendering everything
-function render() {
-	clear();
-	canvasContext.drawImage(cache.main, 0, 0, 1920, 1280);
-}
-// Buttons
-function createButton(id, x, y, dx, dy, imagePath, callback) {
-	canvasContext.drawImage(cache[imagePath], x, y, dx, dy);
-	let hitbox = new Path2D();
-	hitbox.rect(x, y, dx, dy);
-	hitbox.closePath();
-	wrapClickEvent(id, callback, function (e) {
-		getMousePosition(e);
-		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && !paused;
-	});
-}
-function muteButton() {
-	createButton(muted ? "unmute" : "mute", 1920 - 96, 1280 - 96, 96, 96, muted ? "soundOff" : "soundOn", function () {
-		sounds.forEach(function (assetName) {
-			cache[assetName].muted = !muted;
-		});
-		muted = !muted;
-	});
-}
-function textButton(x, y, text, callback, width, ignorePause = false) {
-	setFontSize(8);
-	let buttonWidth = Math.ceil(canvasContext.measureText(text).width / 32) * 32;
-	if (width) {
-		buttonWidth = width - 160;
-	}
-	// Draw button
-	canvasContext.drawImage(cache.buttonStart, x - buttonWidth / 2 - 80, y, 80, 128);
-	canvasContext.drawImage(cache.buttonMiddle, x - buttonWidth / 2, y, buttonWidth, 128);
-	canvasContext.drawImage(cache.buttonEnd, x + buttonWidth / 2, y, 80, 128);
-	canvasContext.textAlign = "center";
-	canvasContext.fillStyle = "rgb(0, 0, 0)";
-	canvasContext.fillText(text, x, y + 92);
-	// Detect clicks
-	let hitbox = new Path2D();
-	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
-	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
-	hitbox.closePath();
-	wrapClickEvent(text.toLowerCase(), callback, function (e) {
-		getMousePosition(e);
-		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause);
-	});
-}
 // State machine
 let stateMachine = new StateMachine({
-	init: "booting",
+	init: "boot",
 	transitions: [
 		{
 			name: "ready",
-			from: "booting",
+			from: "boot",
 			to: "menu"
 		},
 		{
 			name: "start",
 			from: "menu",
 			to: "main"
+		},
+		{
+			name: "toCredits",
+			from: "menu",
+			to: "credits"
 		},
 		{
 			name: "pause",
@@ -174,20 +168,16 @@ let stateMachine = new StateMachine({
 			to: "main"
 		},
 		{
-			name: "quit",
-			from: "paused",
+			name: "toMenu",
+			from: "*",
 			to: "menu"
 		}
 	],
 	methods: {
 		onTransition: function (lifecycle) {
 			console.log("Transition: " + lifecycle.transition + "\nNew State: " + lifecycle.to);
-			for (button in buttons) {
-				removeEventListener("click", buttons[button]);
-				delete buttons[button];
-			}
 		},
-		onBooting: function () {
+		onBoot: function () {
 			loadResources(images, sounds);
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgb(0, 0, 0)";
@@ -204,24 +194,37 @@ let stateMachine = new StateMachine({
 			clear();
 			canvasContext.drawImage(cache.start, 0, 0, 1920, 1280);
 			cache.mainTheme.play();
-			textButton(960, 640, "Easy", function () {
-				console.log("Easy difficulty");
+			textButton(960, 720, "Start", function () {
 				stateMachine.start();
-			}, 480);
-			textButton(960, 800, "Medium", function () {
-				console.log("Medium difficulty");
-				stateMachine.start();
-			}, 480);
-			textButton(960, 960, "Hard", function () {
-				console.log("Hard difficulty");
-				stateMachine.start();
-			}, 480);
+			}, 576);
+			textButton(960, 912, "Credits", function () {
+				stateMachine.toCredits();
+			}, 576);
+			muteButton();
+		},
+		onCredits: function () {
+			clear();
+			canvasContext.drawImage(cache.credits, 0, 0, 1920, 1280);
+			textButton(960, 912, "Return", function () {
+				stateMachine.toMenu();
+			}, 576);
 			muteButton();
 		},
 		onMain: function () {
-			loop();
+			// Main loop
+			if (stateMachine.is("main")) {
+				// Render
+				clear();
+				canvasContext.drawImage(cache.main, 0, 0, 1920, 1280);
+				muteButton();
+				// Handle inputs
+				if ("p" in keysPressed || "P" in keysPressed || "Escape" in keysPressed) {
+					stateMachine.pause();
+				}
+				requestAnimationFrame(stateMachine.onMain);
+			}
 		},
-		onPause: function () {
+		onPaused: function () {
 			paused = true;
 			sounds.forEach(function (assetName, index) {
 				if (!cache[assetName].paused) {
@@ -236,7 +239,7 @@ let stateMachine = new StateMachine({
 			canvasContext.fillStyle = "rgb(255, 255, 255)";
 			canvasContext.fillText("PAUSED", 960, 400);
 			textButton(672, 880, "Menu", function () {
-				stateMachine.quit();
+				stateMachine.toMenu();
 			}, 480, true);
 			textButton(1248, 880, "Return", function () {
 				stateMachine.unpause();
