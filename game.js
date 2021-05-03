@@ -10,8 +10,19 @@ let mouse = {
 	y: 0
 };
 let cache = {};
-const images = ["start", "main", "credits", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
-const sounds = ["mainTheme"];
+const images = [
+	"start",
+	"main",
+	"credits",
+	"buttonStart",
+	"buttonMiddle",
+	"buttonEnd",
+	"soundOn",
+	"soundOff"
+];
+const sounds = [
+	"mainTheme"
+];
 let paused = false;
 let pausedAudio = {};
 let muted = false;
@@ -19,15 +30,15 @@ let buttons = {};
 // Helper functions
 function clear() {
 	canvasContext.clearRect(0, 0, 1920, 1280);
-	for (button in buttons) {
+	for (let button in buttons) {
 		removeEventListener("click", buttons[button]);
 		delete buttons[button];
 	}
 }
 function getMousePosition(event) {
-    let bounds = canvas.getBoundingClientRect();
-    mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
-    mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
+	let bounds = canvas.getBoundingClientRect();
+	mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
+	mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
 }
 function setFontSize(size) {
 	canvasContext.font = `${size * 1024 / 100}px "Commodore 64", sans-serif`;
@@ -111,9 +122,9 @@ function loadResources(images, sounds) {
 		cache[path].src = folder + path + extension;
 	};
 	let success = function (e) {
-		this.removeEventListener(e.type, success);
+		e.target.removeEventListener(e.type, success);
 		successes++;
-		if (successes == images.length + sounds.length) {
+		if (successes === images.length + sounds.length) {
 			// Prompt for user interaction so autoplay won't get blocked
 			clear();
 			canvasContext.rect(0, 0, 1920, 1280);
@@ -126,8 +137,8 @@ function loadResources(images, sounds) {
 			canvasContext.fillText("TO CONTINUE", 960, 960);
 			let waitFunction = function () {
 				console.log(cache);
-				stateMachine.ready();
-			}
+				stateMachine.toMenu();
+			};
 			wrapClickEvent("autoplayPrompt", waitFunction, () => true);
 		}
 	};
@@ -143,8 +154,8 @@ let stateMachine = new StateMachine({
 	init: "boot",
 	transitions: [
 		{
-			name: "ready",
-			from: "boot",
+			name: "toMenu",
+			from: "*",
 			to: "menu"
 		},
 		{
@@ -166,11 +177,6 @@ let stateMachine = new StateMachine({
 			name: "unpause",
 			from: "paused",
 			to: "main"
-		},
-		{
-			name: "toMenu",
-			from: "*",
-			to: "menu"
 		}
 	],
 	methods: {
