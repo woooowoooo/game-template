@@ -232,10 +232,10 @@ let stateMachine = new StateMachine({
 		},
 		onPaused: function () {
 			paused = true;
-			sounds.forEach(function (assetName, index) {
+			sounds.forEach(function (assetName) {
 				if (!cache[assetName].paused) {
 					cache[assetName].pause();
-					pausedAudio[index] = true;
+					pausedAudio[assetName] = true;
 				}
 			});
 			canvasContext.rect(0, 0, 1920, 1280);
@@ -253,13 +253,10 @@ let stateMachine = new StateMachine({
 		},
 		onLeavePaused: function () {
 			paused = false;
-			clear();
-			sounds.forEach(function (assetName, index) {
-				if (pausedAudio[index]) {
-					cache[assetName].play();
-					pausedAudio[index] = false;
-				}
-			});
+			for (let assetName in pausedAudio) {
+				cache[assetName].play();
+				delete pausedAudio[assetName];
+			}
 		}
 	}
 });
