@@ -2,42 +2,31 @@ import StateMachine from "./betterStateMachine.js";
 const canvas = document.getElementById("game");
 canvas.width = 1920;
 canvas.height = 1280;
-let canvasContext = canvas.getContext("2d");
+const canvasContext = canvas.getContext("2d");
 canvasContext.imageSmoothingEnabled = false;
 // Variables
-let keysPressed = {};
-let mouse = {
+const keysPressed = {}; // TODO: Change to set
+const mouse = {
 	x: 0,
 	y: 0
 };
-let cache = {};
-const images = [
-	"start",
-	"main",
-	"credits",
-	"buttonStart",
-	"buttonMiddle",
-	"buttonEnd",
-	"soundOn",
-	"soundOff"
-];
-const sounds = [
-	"mainTheme"
-];
+const cache = {};
 let paused = false;
-let pausedAudio = {};
+const pausedAudio = {};
 let muted = false;
-let buttons = {};
+const buttons = {};
+const images = ["start", "main", "credits", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
+const sounds = ["mainTheme"];
 // Helper functions
 function clear() {
 	canvasContext.clearRect(0, 0, 1920, 1280);
-	for (let button in buttons) {
+	for (const button in buttons) {
 		removeEventListener("click", buttons[button]);
 		delete buttons[button];
 	}
 }
 function getMousePosition(event) {
-	let bounds = canvas.getBoundingClientRect();
+	const bounds = canvas.getBoundingClientRect();
 	mouse.x = (event.clientX - bounds.left) * 1920 / (bounds.right - bounds.left);
 	mouse.y = (event.clientY - bounds.top) * 1280 / (bounds.bottom - bounds.top);
 }
@@ -58,7 +47,7 @@ function wrapClickEvent(listenerID, callback, condition) {
 // Buttons
 function createButton(id, x, y, dx, dy, imagePath, callback) {
 	canvasContext.drawImage(cache[imagePath], x, y, dx, dy);
-	let hitbox = new Path2D();
+	const hitbox = new Path2D();
 	hitbox.rect(x, y, dx, dy);
 	hitbox.closePath();
 	wrapClickEvent(id, callback, function (e) {
@@ -68,9 +57,9 @@ function createButton(id, x, y, dx, dy, imagePath, callback) {
 }
 function muteButton() {
 	createButton(muted ? "unmute" : "mute", 1920 - 96, 1280 - 96, 96, 96, muted ? "soundOff" : "soundOn", function () {
-		sounds.forEach(function (assetName) {
-			cache[assetName].muted = !muted;
-		});
+		for (const soundName of sounds) {
+			cache[soundName].muted = !muted;
+		}
 		muted = !muted;
 		console.log(muted ? "Muted" : "Unmuted");
 		removeEventListener("click", buttons[muted ? "soundOff" : "soundOn"]);
@@ -79,10 +68,7 @@ function muteButton() {
 }
 function textButton(x, y, text, callback, width, ignorePause = false) {
 	setFontSize(8);
-	let buttonWidth = Math.ceil(canvasContext.measureText(text).width / 32) * 32;
-	if (width) {
-		buttonWidth = width - 160;
-	}
+	const buttonWidth = width ? width - 160 : Math.ceil(canvasContext.measureText(text).width / 32) * 32;
 	// Draw button
 	canvasContext.drawImage(cache.buttonStart, x - buttonWidth / 2 - 80, y, 80, 128);
 	canvasContext.drawImage(cache.buttonMiddle, x - buttonWidth / 2, y, buttonWidth, 128);
@@ -91,7 +77,7 @@ function textButton(x, y, text, callback, width, ignorePause = false) {
 	canvasContext.fillStyle = "rgb(0, 0, 0)";
 	canvasContext.fillText(text, x, y + 92);
 	// Detect clicks
-	let hitbox = new Path2D();
+	const hitbox = new Path2D();
 	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
 	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
 	hitbox.closePath();
@@ -117,12 +103,12 @@ addEventListener("click", function (e) {
 function loadResources(images, sounds) {
 	let successes = 0;
 	console.log("Images has length " + images.length + " and sounds has length " + sounds.length + ".");
-	let initialize = function (type, eventType, folder, path, extension) {
+	const initialize = function (type, eventType, folder, path, extension) {
 		cache[path] = document.createElement(type);
 		cache[path].addEventListener(eventType, success);
 		cache[path].src = folder + path + extension;
 	};
-	let success = function (e) {
+	const success = function (e) {
 		e.target.removeEventListener(e.type, success);
 		successes++;
 		if (successes === images.length + sounds.length) {
@@ -143,15 +129,15 @@ function loadResources(images, sounds) {
 			wrapClickEvent("autoplayPrompt", waitFunction, () => true);
 		}
 	};
-	images.forEach(function (assetName) {
-		initialize("img", "load", "images/", assetName, ".png");
-	});
-	sounds.forEach(function (assetName) {
-		initialize("audio", "canplaythrough", "sounds/", assetName, ".mp3");
-	});
+	for (const imageName of images) {
+		initialize("img", "load", "images/", imageName, ".png");
+	}
+	for (const soundName of sounds) {
+		initialize("audio", "canplaythrough", "sounds/", soundName, ".mp3");
+	}
 }
 // State machine
-let stateMachine = new StateMachine({
+const stateMachine = new StateMachine({
 	init: "boot",
 	transitions: [
 		{
@@ -233,12 +219,12 @@ let stateMachine = new StateMachine({
 		},
 		onPaused: function () {
 			paused = true;
-			sounds.forEach(function (assetName) {
-				if (!cache[assetName].paused) {
-					cache[assetName].pause();
-					pausedAudio[assetName] = true;
+			for (const soundName of sounds) {
+				if (!cache[soundName].paused) {
+					cache[soundName].pause();
+					pausedAudio[soundName] = true;
 				}
-			});
+			}
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgba(0, 0, 0, 0.5)";
 			canvasContext.fill();
@@ -254,9 +240,9 @@ let stateMachine = new StateMachine({
 		},
 		onLeavePaused: function () {
 			paused = false;
-			for (let assetName in pausedAudio) {
-				cache[assetName].play();
-				delete pausedAudio[assetName];
+			for (const soundName in pausedAudio) {
+				cache[soundName].play();
+				delete pausedAudio[soundName];
 			}
 		}
 	}
