@@ -13,7 +13,6 @@ const mouse = {
 const images = {};
 const sounds = {};
 let paused = false;
-const pausedAudio = {};
 let muted = false;
 const buttons = {};
 // Helper functions
@@ -202,11 +201,8 @@ const stateMachine = new StateMachine({
 		},
 		onPaused() {
 			paused = true;
-			for (const sound of sounds) {
-				if (!sound.paused) {
-					sound.pause();
-					pausedAudio[sound] = true;
-				}
+			for (const sound of Object.values(sounds).filter(sound => !sound.paused)) {
+				sound.pause();
 			}
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -219,9 +215,8 @@ const stateMachine = new StateMachine({
 		},
 		onLeavePaused() {
 			paused = false;
-			for (const sound in pausedAudio) {
+			for (const sound of Object.values(sounds).filter(sound => sound.paused)) {
 				sound.play();
-				delete pausedAudio[sound];
 			}
 		}
 	}
