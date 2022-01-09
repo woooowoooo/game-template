@@ -33,8 +33,8 @@ function getMousePosition(event) {
 function setFontSize(size) {
 	canvasContext.font = `${size * 1024 / 100}px "Commodore 64", sans-serif`;
 }
-function wrapClickEvent(listenerID, callback, condition) {
-	let fullCallback = function (e) {
+function wrapClickEvent(listenerID, callback, condition = (() => true)) {
+	function fullCallback(e) {
 		getMousePosition(e);
 		if (condition(e)) {
 			callback();
@@ -50,10 +50,7 @@ function createButton(id, x, y, dx, dy, imagePath, callback) {
 	const hitbox = new Path2D();
 	hitbox.rect(x, y, dx, dy);
 	hitbox.closePath();
-	wrapClickEvent(id, callback, function (e) {
-		getMousePosition(e);
-		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && !paused;
-	});
+	wrapClickEvent(id, callback, () => canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && !paused);
 }
 function muteButton() {
 	createButton(muted ? "unmute" : "mute", 1920 - 96, 1280 - 96, 96, 96, muted ? "soundOff" : "soundOn", function () {
@@ -81,28 +78,25 @@ function textButton(x, y, text, callback, width, ignorePause = false) {
 	hitbox.rect(x - buttonWidth / 2 - 64, y, buttonWidth + 128, 128);
 	hitbox.rect(x - buttonWidth / 2 - 80, y + 16, buttonWidth + 160, 96);
 	hitbox.closePath();
-	wrapClickEvent(text.toLowerCase(), callback, function (e) {
-		getMousePosition(e);
-		return canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause);
-	});
+	wrapClickEvent(text.toLowerCase(), callback, () => canvasContext.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause));
 }
 // Noting input
-addEventListener("keydown", function (e) {
+addEventListener("keydown", e => {
 	keysPressed[e.key] = true;
-	console.log("The \"" + e.key + "\" key was pressed.");
+	console.log(`The "${e.key}" key was pressed.`);
 });
-addEventListener("keyup", function (e) {
+addEventListener("keyup", e => {
 	delete keysPressed[e.key];
-	console.log("The \"" + e.key + "\" key was released.");
+	console.log(`The "${e.key}" key was released.`);
 });
-addEventListener("click", function (e) {
+addEventListener("click", e => {
 	getMousePosition(e);
 	console.log("The mouse was clicked on " + mouse.x + ", " + mouse.y + ".");
 });
 // Loading assets
 function loadResources(images, sounds) {
 	let successes = 0;
-	console.log("Images has length " + images.length + " and sounds has length " + sounds.length + ".");
+	console.log(`Images has length "${images.length}" and sounds has length "${sounds.length}".`);
 	const initialize = function (type, eventType, folder, path, extension) {
 		cache[path] = document.createElement(type);
 		cache[path].addEventListener(eventType, success);
@@ -122,11 +116,10 @@ function loadResources(images, sounds) {
 			canvasContext.fillText("Loading finished.", 960, 400);
 			canvasContext.fillText("CLICK ANYWHERE", 960, 800);
 			canvasContext.fillText("TO CONTINUE", 960, 960);
-			let waitFunction = function () {
+			wrapClickEvent("autoplayPrompt", () => {
 				console.log(cache);
 				stateMachine.toMenu();
-			};
-			wrapClickEvent("autoplayPrompt", waitFunction, () => true);
+			});
 		}
 	};
 	for (const imageName of images) {
@@ -168,7 +161,7 @@ const stateMachine = new StateMachine({
 	],
 	methods: {
 		onTransition: function (lifecycle) {
-			console.log("Transition: " + lifecycle.transition + "\nNew State: " + lifecycle.to);
+			console.log(`Transition: ${lifecycle.transition}\nNew State: ${lifecycle.to}`);
 		},
 		onBoot: function () {
 			loadResources(images, sounds);
@@ -187,20 +180,14 @@ const stateMachine = new StateMachine({
 			clear();
 			canvasContext.drawImage(cache.start, 0, 0, 1920, 1280);
 			cache.mainTheme.play();
-			textButton(960, 720, "Start", function () {
-				stateMachine.start();
-			}, 576);
-			textButton(960, 912, "Credits", function () {
-				stateMachine.toCredits();
-			}, 576);
+			textButton(960, 720, "Start", stateMachine.start, 576);
+			textButton(960, 912, "Credits", stateMachine.toCredits, 576);
 			muteButton();
 		},
 		onCredits: function () {
 			clear();
 			canvasContext.drawImage(cache.credits, 0, 0, 1920, 1280);
-			textButton(960, 912, "Return", function () {
-				stateMachine.toMenu();
-			}, 576);
+			textButton(960, 912, "Return", stateMachine.toMenu, 576);
 			muteButton();
 		},
 		onMain: function () {
@@ -231,12 +218,8 @@ const stateMachine = new StateMachine({
 			setFontSize(16);
 			canvasContext.fillStyle = "rgb(255, 255, 255)";
 			canvasContext.fillText("PAUSED", 960, 400);
-			textButton(672, 880, "Menu", function () {
-				stateMachine.toMenu();
-			}, 480, true);
-			textButton(1248, 880, "Return", function () {
-				stateMachine.unpause();
-			}, 480, true);
+			textButton(672, 880, "Menu", stateMachine.toMenu, 480, true);
+			textButton(1248, 880, "Return", stateMachine.unpause, 480, true);
 		},
 		onLeavePaused: function () {
 			paused = false;
