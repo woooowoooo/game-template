@@ -1,4 +1,5 @@
-let canvas = document.getElementById("game");
+import StateMachine from "./betterStateMachine.js";
+const canvas = document.getElementById("game");
 canvas.width = 1920;
 canvas.height = 1280;
 let canvasContext = canvas.getContext("2d");
