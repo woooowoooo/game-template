@@ -160,11 +160,11 @@ const stateMachine = new StateMachine({
 		}
 	],
 	methods: {
-		onTransition: function (lifecycle) {
+		onTransition(lifecycle) {
 			console.log(`Transition: ${lifecycle.transition}\nNew State: ${lifecycle.to}`);
 		},
-		onBoot: function () {
 			loadResources(images, sounds);
+		onBoot() {
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgb(0, 0, 0)";
 			canvasContext.fill();
@@ -176,7 +176,7 @@ const stateMachine = new StateMachine({
 			canvasContext.fillText("If this doesn't go away,", 960, 800);
 			canvasContext.fillText("refresh the page.", 960, 960);
 		},
-		onMenu: function () {
+		onMenu() {
 			clear();
 			canvasContext.drawImage(cache.start, 0, 0, 1920, 1280);
 			cache.mainTheme.play();
@@ -184,13 +184,13 @@ const stateMachine = new StateMachine({
 			textButton(960, 912, "Credits", stateMachine.toCredits, 576);
 			muteButton();
 		},
-		onCredits: function () {
+		onCredits() {
 			clear();
 			canvasContext.drawImage(cache.credits, 0, 0, 1920, 1280);
 			textButton(960, 912, "Return", stateMachine.toMenu, 576);
 			muteButton();
 		},
-		onMain: function () {
+		onMain() {
 			// Main loop
 			if (stateMachine.is("main")) {
 				// Render
@@ -204,7 +204,7 @@ const stateMachine = new StateMachine({
 				requestAnimationFrame(stateMachine.onMain);
 			}
 		},
-		onPaused: function () {
+		onPaused() {
 			paused = true;
 			for (const soundName of sounds) {
 				if (!cache[soundName].paused) {
@@ -221,7 +221,7 @@ const stateMachine = new StateMachine({
 			textButton(672, 880, "Menu", stateMachine.toMenu, 480, true);
 			textButton(1248, 880, "Return", stateMachine.unpause, 480, true);
 		},
-		onLeavePaused: function () {
+		onLeavePaused() {
 			paused = false;
 			for (const soundName in pausedAudio) {
 				cache[soundName].play();
