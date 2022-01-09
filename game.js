@@ -92,34 +92,17 @@ addEventListener("click", e => {
 	getMousePosition(e);
 	console.log("The mouse was clicked on " + mouse.x + ", " + mouse.y + ".");
 });
-// Loading assets TODO: Change to async
-function loadResources(imageNames, soundNames) {
-	let successes = 0;
-	console.log(`Images has length "${imageNames.length}" and sounds has length "${soundNames.length}".`);
+// Loading assets
+async function loadResources() {
+	const imageNames = ["start", "main", "credits", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
+	const soundNames = ["mainTheme"];
+	const promises = [];
 	const initialize = function (cache, type, eventType, folder, path, extension) {
 		cache[path] = document.createElement(type);
-		cache[path].addEventListener(eventType, success);
 		cache[path].src = folder + path + extension;
-	};
-	const success = function (e) {
-		e.target.removeEventListener(e.type, success);
-		successes++;
-		if (successes === imageNames.length + soundNames.length) {
-			// Prompt for user interaction so autoplay won't get blocked
-			clear();
-			canvasContext.rect(0, 0, 1920, 1280);
-			canvasContext.fillStyle = "rgb(0, 0, 0)";
-			canvasContext.fill();
-			setFontSize(8);
-			canvasContext.fillStyle = "rgb(255, 255, 255)";
-			canvasContext.fillText("Loading finished.", 960, 400);
-			canvasContext.fillText("CLICK ANYWHERE", 960, 800);
-			canvasContext.fillText("TO CONTINUE", 960, 960);
-			wrapClickEvent("autoplayPrompt", () => {
-				console.log(imageNames);
-				stateMachine.toMenu();
-			});
-		}
+		promises.push(new Promise(resolve => {
+			cache[path].addEventListener(eventType, resolve, {once: true});
+		}));
 	};
 	for (const imageName of imageNames) {
 		initialize(images, "img", "load", "images/", imageName, ".png");
@@ -127,6 +110,7 @@ function loadResources(imageNames, soundNames) {
 	for (const soundName of soundNames) {
 		initialize(sounds, "audio", "canplaythrough", "sounds/", soundName, ".mp3");
 	}
+	return Promise.all(promises);
 }
 // State machine
 const stateMachine = new StateMachine({
@@ -162,10 +146,8 @@ const stateMachine = new StateMachine({
 		onTransition(lifecycle) {
 			console.log(`Transition: ${lifecycle.transition}\nNew State: ${lifecycle.to}`);
 		},
-		onBoot() {
-			const imageNames = ["start", "main", "credits", "buttonStart", "buttonMiddle", "buttonEnd", "soundOn", "soundOff"];
-			const soundNames = ["mainTheme"];
-			loadResources(imageNames, soundNames);
+		async onBoot() {
+			// Loading screen
 			canvasContext.rect(0, 0, 1920, 1280);
 			canvasContext.fillStyle = "rgb(0, 0, 0)";
 			canvasContext.fill();
@@ -176,6 +158,19 @@ const stateMachine = new StateMachine({
 			setFontSize(8);
 			canvasContext.fillText("If this doesn't go away,", 960, 800);
 			canvasContext.fillText("refresh the page.", 960, 960);
+			await loadResources();
+			console.log("Resources loaded.", images, sounds);
+			// Prompt for user interaction so autoplay won't get blocked
+			clear();
+			canvasContext.rect(0, 0, 1920, 1280);
+			canvasContext.fillStyle = "rgb(0, 0, 0)";
+			canvasContext.fill();
+			setFontSize(8);
+			canvasContext.fillStyle = "rgb(255, 255, 255)";
+			canvasContext.fillText("Loading finished.", 960, 400);
+			canvasContext.fillText("CLICK ANYWHERE", 960, 800);
+			canvasContext.fillText("TO CONTINUE", 960, 960);
+			wrapClickEvent("autoplayPrompt", stateMachine.toMenu);
 		},
 		onMenu() {
 			clear();
