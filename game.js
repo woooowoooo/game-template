@@ -14,13 +14,19 @@ const images = {};
 const sounds = {};
 let paused = false;
 let muted = false;
-const buttons = {};
+const objects = new Map();
 // Helper functions
 function clear() {
 	context.clearRect(0, 0, 1920, 1280);
-	for (const button in buttons) {
-		canvas.removeEventListener("click", buttons[button].fullCallback);
-		delete buttons[button];
+	for (const object of Array.from(objects.values()).filter(object => (object instanceof Button))) {
+		canvas.removeEventListener("click", object.fullCallback);
+	}
+	objects.clear();
+}
+function render() {
+	context.clearRect(0, 0, 1920, 1280);
+	for (const object of objects.values()) {
+		object.draw();
 	}
 }
 function getMousePosition(event) {
@@ -42,26 +48,30 @@ function wrapClickEvent(callback, condition = (() => true)) {
 	canvas.addEventListener("click", fullCallback);
 	return fullCallback;
 }
-// Buttons
-class Button {
-	constructor (id, hitbox, draw, callback, ignorePause = false) {
-		this.id = id;
-		this.callback = callback;
+// Classes
+class Drawable {
+	constructor (draw) {
 		this.draw = draw;
+		draw();
+	}
+}
+class Button extends Drawable {
+	constructor (hitbox, draw, callback, ignorePause = false) {
+		super(draw);
+		this.callback = callback;
 		this.hitbox = hitbox;
 		this.fullCallback = wrapClickEvent(callback, () => context.isPointInPath(hitbox, mouse.x, mouse.y) && (!paused || ignorePause));
-		draw();
 	}
 }
 class MuteButton extends Button {
 	constructor () {
-		const [x, y, dx, dy] = [1920 - 96, 1280 - 96, 96, 96];
+		const [X, Y, DX, DY] = [1920 - 96, 1280 - 96, 96, 96];
 		const name = muted ? "unmute" : "mute";
 		const hitbox = new Path2D();
-		hitbox.rect(x, y, dx, dy);
+		hitbox.rect(X, Y, DX, DY);
 		hitbox.closePath();
 		function draw() {
-			context.drawImage(images[muted ? "soundOff" : "soundOn"], x, y, dx, dy);
+			context.drawImage(images[muted ? "soundOff" : "soundOn"], X, Y, DX, DY);
 		}
 		function callback() {
 			muted = !muted;
@@ -69,10 +79,12 @@ class MuteButton extends Button {
 			for (const sound of Object.values(sounds)) {
 				sound.muted = muted;
 			}
-			delete buttons[name];
-			buttons[muted ? "unmute" : "mute"] = new MuteButton();
+			objects.delete(name);
+			// Doesn't use name because muted has been toggled
+			objects.set(muted ? "unmute" : "mute", new MuteButton());
+			render();
 		}
-		super(name, hitbox, draw, callback);
+		super(hitbox, draw, callback);
 	}
 }
 class TextButton extends Button {
@@ -91,7 +103,7 @@ class TextButton extends Button {
 			context.fillStyle = "rgb(0, 0, 0)";
 			context.fillText(text, x, y + 92);
 		}
-		super(text.toLowerCase(), hitbox, draw, callback, ignorePause);
+		super(hitbox, draw, callback, ignorePause);
 	}
 }
 // Noting input
@@ -188,21 +200,22 @@ const stateMachine = new StateMachine({
 		},
 		onMenu() {
 			clear();
-			context.drawImage(images.start, 0, 0, 1920, 1280);
 			sounds.mainTheme.play();
-			buttons.start = new TextButton(960, 720, "Start", stateMachine.start, 576);
-			buttons.credits = new TextButton(960, 912, "Credits", stateMachine.toCredits, 576);
-			buttons[muted ? "unmute" : "mute"] = new MuteButton();
+			objects.set("background", new Drawable(() => context.drawImage(images.start, 0, 0, 1920, 1280)));
+			objects.set("start", new TextButton(960, 720, "Start", stateMachine.start, 576));
+			objects.set("credits", new TextButton(960, 912, "Credits", stateMachine.toCredits, 576));
+			objects.set(muted ? "unmute" : "mute", new MuteButton());
 		},
 		onCredits() {
 			clear();
-			context.drawImage(images.credits, 0, 0, 1920, 1280);
-			buttons.return = new TextButton(960, 912, "Return", stateMachine.toMenu, 576);
-			buttons[muted ? "unmute" : "mute"] = new MuteButton();
+			objects.set("background", new Drawable(() => context.drawImage(images.credits, 0, 0, 1920, 1280)));
+			objects.set("return", new TextButton(960, 912, "Return", stateMachine.toMenu, 576));
+			objects.set(muted ? "unmute" : "mute", new MuteButton());
 		},
 		onMain() {
 			clear();
-			buttons[muted ? "unmute" : "mute"] = new MuteButton();
+			objects.set("background", new Drawable(() => context.drawImage(images.main, 0, 0, 1920, 1280)));
+			objects.set(muted ? "unmute" : "mute", new MuteButton());
 			requestAnimationFrame(loop);
 		},
 		onPaused() {
@@ -210,14 +223,16 @@ const stateMachine = new StateMachine({
 			for (const sound of Object.values(sounds).filter(sound => !sound.paused)) {
 				sound.pause();
 			}
-			context.rect(0, 0, 1920, 1280);
-			context.fillStyle = "rgba(0, 0, 0, 0.5)";
-			context.fill();
-			setFontSize(16);
-			context.fillStyle = "rgb(255, 255, 255)";
-			context.fillText("PAUSED", 960, 400);
-			buttons.menu = new TextButton(672, 880, "Menu", stateMachine.toMenu, 480, true);
-			buttons.return = new TextButton(1248, 880, "Return", stateMachine.unpause, 480, true);
+			objects.set("paused", new Drawable(() => {
+				context.rect(0, 0, 1920, 1280);
+				context.fillStyle = "rgba(0, 0, 0, 0.5)";
+				context.fill();
+				setFontSize(16);
+				context.fillStyle = "rgb(255, 255, 255)";
+				context.fillText("PAUSED", 960, 400);
+			}));
+			objects.set("menu", new TextButton(672, 880, "Menu", stateMachine.toMenu, 480, true));
+			objects.set("return", new TextButton(1248, 880, "Return", stateMachine.unpause, 480, true));
 		},
 		onLeavePaused() {
 			paused = false;
@@ -232,14 +247,10 @@ function loop() {
 	if (!stateMachine.is("main")) {
 		return;
 	}
-	// Render
-	context.clearRect(0, 0, 1920, 1280);
-	context.drawImage(images.main, 0, 0, 1920, 1280);
-	buttons[muted ? "unmute" : "mute"].draw();
+	render();
 	// Handle inputs
 	if (keysPressed.has("p") || keysPressed.has("P") || keysPressed.has("Escape")) {
 		stateMachine.pause();
-		return;
 	}
 	requestAnimationFrame(loop);
 }
