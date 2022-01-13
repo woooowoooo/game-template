@@ -209,6 +209,7 @@ class JSM {
 		if (this.config.init.active) {
 			return this.fire(this.config.init.name, []);
 		}
+		return null;
 	}
 	is(state) {
 		return Array.isArray(state) ? (state.indexOf(this.state) >= 0) : (this.state === state);
