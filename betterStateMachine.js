@@ -52,16 +52,6 @@ function prepend(prepend, label) {
 	label = camelize(label);
 	return prepend + label[0].toUpperCase() + label.substring(1);
 }
-function mixin(target, ...sources) {
-	for (let source of sources) {
-		for (let key in source) {
-			if (Object.hasOwn(source, key)) {
-				target[key] = source[key];
-			}
-		}
-	}
-	return target;
-}
 function hook(fsm, name, additional) {
 	let plugins = fsm.config.plugins;
 	let args = [fsm.context];
@@ -83,12 +73,12 @@ class Config {
 		this.states = [];
 		this.transitions = [];
 		this.map = {};
+		this.map[this.defaults.wildcard] = {};
 		this.lifecycle = this.configureLifecycle();
 		this.init = this.configureInitTransition(options.init);
 		this.data = this.configureData(options.data);
-		this.methods = this.configureMethods(options.methods);
-		this.map[this.defaults.wildcard] = {};
-		this.configureTransitions(options.transitions ?? []);
+		this.methods = options.methods ?? {};
+		this.configureTransitions(options.transitions);
 		this.plugins = this.configurePlugins(options.plugins, StateMachine.plugin);
 	}
 	addState(name) {
@@ -115,9 +105,7 @@ class Config {
 		this.lifecycle.on[name] = prepend('on', name);
 	}
 	mapTransition(transition) {
-		let name = transition.name;
-		let from = transition.from;
-		let to = transition.to;
+		let {name, from, to} = transition;
 		this.addState(from);
 		if (typeof to !== 'function') {
 			this.addState(to);
@@ -137,9 +125,9 @@ class Config {
 	}
 	configureInitTransition(init) {
 		if (typeof init === 'string') {
-			return this.mapTransition(mixin({}, this.defaults.init, {to: init, active: true}));
+			return this.mapTransition({...this.defaults.init, to: init, active: true});
 		} else if (typeof init === 'object') {
-			return this.mapTransition(mixin({}, this.defaults.init, init, {active: true}));
+			return this.mapTransition({...this.defaults.init, ...init, active: true});
 		} else {
 			this.addState(this.defaults.init.from);
 			return this.defaults.init;
@@ -154,12 +142,8 @@ class Config {
 			return (() => {});
 		}
 	}
-	configureMethods(methods) {
-		return methods ?? {};
-	}
-	configurePlugins(plugins, builtin) {
-		plugins = plugins ?? [];
-		for (let n = 0; n < plugins.length; n++) {
+	configurePlugins(plugins = [], builtin) { // builtin is unused?
+		for (let n in plugins) {
 			let plugin = plugins[n];
 			if (typeof plugin === 'function') {
 				let plugin = plugin();
@@ -171,7 +155,7 @@ class Config {
 		}
 		return plugins;
 	}
-	configureTransitions(transitions) {
+	configureTransitions(transitions = []) {
 		let wildcard = this.defaults.wildcard;
 		for (let transition of transitions) {
 			let from = Array.isArray(transition.from) ? transition.from : [transition.from ?? wildcard];
@@ -204,7 +188,7 @@ class JSM {
 		this.observers = [context];
 	}
 	init(args) {
-		mixin(this.context, this.config.data.apply(this.context, args));
+		Object.assign(this.context, this.config.data.apply(this.context, args));
 		hook(this, 'init');
 		if (this.config.init.active) {
 			return this.fire(this.config.init.name, []);
@@ -350,12 +334,12 @@ function apply(instance, options) {
 	return instance;
 }
 function build(target, config) {
-	if ((typeof target !== 'object') ?? Array.isArray(target)) {
+	if ((typeof target !== 'object') || Array.isArray(target)) {
 		throw Error('StateMachine can only be applied to objects');
 	}
 	for (let plugin of config.plugins) { // pluginHelper.build
 		if (plugin.methods) {
-			mixin(target, plugin.methods);
+			Object.assign(target, plugin.methods);
 		}
 		if (plugin.properties) {
 			Object.defineProperties(target, plugin.properties);
@@ -369,7 +353,7 @@ function build(target, config) {
 			throw Error('use transitions to change state');
 		}
 	});
-	mixin(target, { // PublicMethods
+	Object.assign(target, { // PublicMethods
 		is: state => target._fsm.is(state),
 		can: transition => target._fsm.can(transition),
 		cannot: transition => target._fsm.cannot(transition),
@@ -380,7 +364,7 @@ function build(target, config) {
 		onInvalidTransition: (t, from, to) => target._fsm.onInvalidTransition(t, from, to),
 		onPendingTransition: (t, from, to) => target._fsm.onPendingTransition(t, from, to)
 	});
-	mixin(target, config.methods);
+	Object.assign(target, config.methods);
 	for (let transition of config.allTransitions()) {
 		target[camelize(transition)] = function () {
 			return target._fsm.fire(transition, [].slice.call(arguments));
@@ -395,7 +379,6 @@ export default class StateMachine {
 	constructor (options) {
 		return apply(this ?? {}, options);
 	}
-	/* Change once static fields reach Stage 4
 	static version = '3.0.1';
 	static apply = apply;
 	static defaults = {
@@ -404,7 +387,7 @@ export default class StateMachine {
 			name: 'init',
 			from: 'none'
 		}
-	} */
+	};
 	static factory() {
 		let cstor = (typeof arguments[0] === 'function') ? arguments[0] : () => this._fsm(...arguments);
 		let options = arguments[(typeof arguments[0] === 'function') ? 1 : 0] ?? {};
@@ -414,12 +397,3 @@ export default class StateMachine {
 		return cstor;
 	};
 }
-StateMachine.version = '3.0.1';
-StateMachine.apply = apply;
-StateMachine.defaults = {
-	wildcard: '*',
-	init: {
-		name: 'init',
-		from: 'none'
-	}
-};
