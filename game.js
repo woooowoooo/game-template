@@ -1,4 +1,4 @@
-import StateMachine from "./betterStateMachine.js";
+import StateMachine from "./state-machine/module.js";
 const canvas = document.getElementById("game");
 canvas.width = 1920;
 canvas.height = 1280;
